@@ -56,7 +56,7 @@ export function LoginView() {
     signInDemo();
     toast({
       title: "Demo mode active",
-      description: "Signed in as Amara Osei, Safety Operations Director.",
+      description: "Signed in as Krithik S, Safety Operations Director.",
       variant: "success",
     });
     router.push("/dashboard");
@@ -94,7 +94,7 @@ export function LoginView() {
           {mode === "signup" && (
             <div className="space-y-1.5">
               <Label htmlFor="name">Full name</Label>
-              <Input id="name" placeholder="Amara Osei" {...register("name")} />
+              <Input id="name" placeholder="Krithik S" {...register("name")} />
             </div>
           )}
           <div className="space-y-1.5">

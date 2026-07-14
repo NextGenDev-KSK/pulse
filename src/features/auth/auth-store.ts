@@ -25,7 +25,7 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
-function demoUser(name = "Amara Osei", role: UserRole = "director"): AuthUser {
+function demoUser(name = "Krithik S", role: UserRole = "director"): AuthUser {
   return {
     uid: "demo-" + role,
     displayName: name,

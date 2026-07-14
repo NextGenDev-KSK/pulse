@@ -6,7 +6,7 @@
 
 Built for **PromptWars Challenge 4**.
 
-[Architecture](docs/ARCHITECTURE.md) · [Demo guide](docs/DEMO.md) · [Deployment](docs/DEPLOYMENT.md) · [Security](docs/security.md)
+**Live demo → https://pulse-vercel-tau.vercel.app**
 
 </div>
 
@@ -30,9 +30,18 @@ upgrade the reasoning to the real model, and Firebase keys to enable real auth a
 Modern venues are saturated with cameras and sensors but have no system that *acts* on what they
 see. Control rooms watch dashboards and react after an incident has already formed. PULSE is the
 missing layer between sensing and response: senses (Vision), a cortex (Brain), motor neurons
-(Dispatch), and a conscience (Reunite). The goal is prevention and accountable action, not
-another monitoring wall — with the ethics constraints (no biometrics, human-in-the-loop, full
-audit trail) built in from the start rather than bolted on.
+(Dispatch), and a conscience (Reunite). The goal is prevention and accountable action — with the
+ethics constraints (no biometrics, human-in-the-loop, full audit trail) built in from the start.
+
+## Screenshots
+
+| Operations dashboard | Pulse Vision |
+|---|---|
+| ![Operations dashboard](docs/Screenshots/dashboard.png) | ![Pulse Vision heatmap](docs/Screenshots/vision.png) |
+| **Pulse Brain** | **Pulse Dispatch** |
+| ![Pulse Brain reasoning](docs/Screenshots/brain.png) | ![Pulse Dispatch board](docs/Screenshots/dispatch.png) |
+| **Pulse Reunite** | **Decision Ledger** |
+| ![Pulse Reunite matches](docs/Screenshots/reunite.png) | ![Decision ledger](docs/Screenshots/ledger.png) |
 
 ## Features
 
@@ -57,7 +66,7 @@ audit trail) built in from the start rather than bolted on.
 ## AI agent architecture
 
 Four agents run against the live stream. Gemini is used only where judgment is needed;
-deterministic math stays in code. Each call is recorded to the decision ledger.
+deterministic math (distance, ETA, SLA) stays in code. Each call is recorded to the decision ledger.
 
 | Agent | Module | Responsibility | Server route |
 |-------|--------|----------------|--------------|
@@ -69,33 +78,13 @@ deterministic math stays in code. Each call is recorded to the decision ledger.
 Every `/api/ai/*` handler requests structured output with a strict `responseSchema`, re-validates
 it against the same Zod schema, and falls back to a deterministic **heuristic** in the identical
 shape on a missing key, an 8-second timeout, or malformed output. The response is always tagged
-`engine: "gemini" | "heuristic"` and the UI shows which one answered. Full detail in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`engine: "gemini" | "heuristic"` and the UI shows which one answered.
 
 ## Technology stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript (strict) · Tailwind CSS v4 ·
 Framer Motion · Recharts · Zustand · Zod · React Hook Form · Gemini (`@google/genai`) ·
 Firebase (optional) · Lucide icons.
-
-## Screenshots
-
-_Screenshots have not been captured yet._ To generate them, run the app
-(`npm run dev`), walk the [demo flow](#demo-flow), and save images into `docs/screenshots/`.
-Suggested set:
-
-| View | File |
-|------|------|
-| Operations dashboard | `docs/screenshots/dashboard.png` |
-| Pulse Vision heatmap | `docs/screenshots/vision.png` |
-| Pulse Brain reasoning chain | `docs/screenshots/brain.png` |
-| Pulse Dispatch board + SLA | `docs/screenshots/dispatch.png` |
-| Pulse Reunite candidate matches | `docs/screenshots/reunite.png` |
-| Decision ledger | `docs/screenshots/ledger.png` |
-
-<!-- Once captured:
-![Operations dashboard](docs/screenshots/dashboard.png)
--->
 
 ## Demo flow
 
@@ -106,8 +95,7 @@ Suggested set:
 5. **Reunite** — trigger *Lost child report*; watch Guardian extract, sweep, and score matches, then confirm the reunion.
 6. **Account** — open the **Decision Ledger** for every AI decision with its reasoning, engine, and latency.
 
-Press `⌘K` / `Ctrl+K` anywhere for the command palette. Full script and judge Q&A in
-[docs/DEMO.md](docs/DEMO.md).
+Press `⌘K` / `Ctrl+K` anywhere for the command palette. Nav chords: `g` then `d/v/b/x/r/a/l`.
 
 ## Local installation
 
@@ -132,21 +120,22 @@ npx eslint .           # lint (0 errors; a few documented advisory warnings)
 
 ## Deployment
 
-PULSE deploys to Vercel with no special configuration — import the repo and deploy. A
-deployment with no environment variables is already a working demo. See
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full runbook, including CLI deploys, Firebase
-setup, and a post-deploy smoke test.
+Deployed on **Vercel** — import the repo and deploy. A deployment with no environment variables
+is already a working demo (Demo Mode + heuristic engine). Add `GEMINI_API_KEY` in the Vercel
+project settings to activate real Gemini reasoning; the AI layer switches over automatically on
+the next request. Response security headers are applied by `next.config.ts` and require no extra
+configuration.
 
 ## Environment variables
 
-All optional — the app runs fully in Demo Mode with none. Copy `.env.example` to `.env.local`
-to enable the real paths. `GEMINI_API_KEY` is **server-side only** and is never exposed to the
-browser.
+All optional — the app runs fully in Demo Mode with none. Copy `.env.example` to `.env.local` to
+enable the real paths. `GEMINI_API_KEY` is **server-side only** and is never exposed to the browser.
 
 | Variable | Effect if set |
 |----------|---------------|
 | `GEMINI_API_KEY` | Enables real Gemini reasoning (otherwise the heuristic engine is used). |
-| `GEMINI_MODEL` | Overrides the model (default `gemini-2.0-flash`). |
+| `GEMINI_MODEL` | Overrides the model actually called (defaults to `gemini-2.0-flash`). |
+| `NEXT_PUBLIC_GEMINI_MODEL` | Display-only label shown in the ledger (defaults to `gemini-2.0-flash`). |
 | `NEXT_PUBLIC_FIREBASE_*` | Enables Firebase Auth and Firestore (six values; see `.env.example`). |
 
 ## Project structure
@@ -158,10 +147,9 @@ src/
   features/         vision brain dispatch reunite operations analytics ledger
                     simulation (engine + scenario director) · auth · marketing
   lib/              ai/ (gemini, prompts, schemas, heuristics) · schemas/ (Zod source of truth)
-                    stadium/ · firebase/ · utils
+                    stadium/ · firebase/ · api/ · utils
   stores/           zustand stores (simulation, incidents, dispatch, reunite, decisions, ui, ai)
   hooks/
-docs/               ARCHITECTURE.md BLUEPRINT.md DEMO.md DEPLOYMENT.md progress.md security.md
 ```
 
 ## Privacy & ethics
@@ -172,16 +160,13 @@ docs/               ARCHITECTURE.md BLUEPRINT.md DEMO.md DEPLOYMENT.md progress.
 - **Human-in-the-loop** — reunions and high-impact actions are confirmed by an operator.
 - **Auditable** — every agent decision is immutable in the ledger with its full reasoning chain.
 
-## Future roadmap
+## Roadmap
 
-- Firestore mirror (`FirestoreBus`) for multi-console sync.
+- Firestore mirror for multi-console sync.
 - Unit tests for the simulation model, steward assignment, and heuristic engines.
 - Role-based steward mobile task view.
-- Multi-venue configuration (externalized zone graph for concerts, transit hubs, and more).
-- PDF report export in addition to CSV/JSON.
+- Multi-venue configuration (externalized zone graph).
 - Nonce-based strict Content-Security-Policy.
-
-See [CHANGELOG.md](CHANGELOG.md) for released work.
 
 ## License
 

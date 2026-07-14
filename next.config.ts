@@ -5,8 +5,8 @@ const isDev = process.env.NODE_ENV !== "production";
 /**
  * Content-Security-Policy.
  * - script-src allows 'unsafe-inline' for Next's bootstrap inline scripts (a
- *   nonce-based strict policy is documented as a future hardening step in
- *   docs/security.md). 'unsafe-eval' is dev-only (Turbopack HMR).
+ *   nonce-based strict policy is a possible future hardening step).
+ *   'unsafe-eval' is dev-only (Turbopack HMR).
  * - style-src allows 'unsafe-inline' because Tailwind/Framer/Recharts emit
  *   inline styles.
  * - connect-src permits same-origin (our /api) plus Firebase/Google endpoints
