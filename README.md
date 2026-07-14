@@ -77,7 +77,7 @@ deterministic math (distance, ETA, SLA) stays in code. Each call is recorded to 
 
 Every `/api/ai/*` handler requests structured output with a strict `responseSchema`, re-validates
 it against the same Zod schema, and falls back to a deterministic **heuristic** in the identical
-shape on a missing key, an 8-second timeout, or malformed output. The response is always tagged
+shape on a missing key, a 9-second timeout, or malformed output. The response is always tagged
 `engine: "gemini" | "heuristic"` and the UI shows which one answered.
 
 ## Technology stack
