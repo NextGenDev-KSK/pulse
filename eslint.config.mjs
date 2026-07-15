@@ -22,6 +22,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated artifacts.
+    "coverage/**",
     // Local verification scripts (not part of the app).
     "shoot*.mjs",
   ]),
