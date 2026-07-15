@@ -72,6 +72,20 @@ export const SLA_BY_SEVERITY: Record<number, number> = {
   1: 2700,
 };
 
+export function slaForSeverity(severity: number): number {
+  return SLA_BY_SEVERITY[severity] ?? 600;
+}
+
+/**
+ * A dispatch meets SLA when the responder's modelled response time (ETA, in the
+ * same second domain as the SLA budget) is within the severity budget. Both
+ * `etaSeconds` and the budget are simulated seconds — comparing them keeps the
+ * SLA verdict consistent between the dispatch pipeline and the timer UI.
+ */
+export function isSlaBreached(etaSeconds: number, severity: number): boolean {
+  return etaSeconds > slaForSeverity(severity);
+}
+
 export const INCIDENT_META: Record<
   IncidentType,
   { label: string; skill: StewardSkill | "any"; icon: string }

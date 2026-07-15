@@ -1,32 +1,21 @@
-import { NextResponse } from "next/server";
-import { matchRequestSchema, type AiResponse } from "@/lib/ai/contracts";
+import { matchRequestSchema } from "@/lib/ai/contracts";
 import { generateStructured } from "@/lib/ai/gemini";
 import { matchSchema } from "@/lib/ai/response-schemas";
 import { MATCH_SYSTEM, matchPrompt } from "@/lib/ai/prompts";
 import { heuristicMatch } from "@/lib/ai/heuristics";
-import { candidateSchema, type Candidate } from "@/lib/schemas/domain";
+import { candidateSchema } from "@/lib/schemas/domain";
+import { aiSuccess, invalidRequest, preflight } from "@/lib/api/security";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "invalid-json" } satisfies AiResponse<never>,
-      { status: 400 },
-    );
-  }
+  const pre = await preflight(request, { rateKeyPrefix: "match" });
+  if (!pre.ok) return pre.response;
 
-  const parsed = matchRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid-request" } satisfies AiResponse<never>,
-      { status: 422 },
-    );
-  }
+  const parsed = matchRequestSchema.safeParse(pre.ctx.body);
+  if (!parsed.success) return invalidRequest(pre.ctx.requestId);
+
   const input = parsed.data;
   const started = Date.now();
   const meta = new Map(
@@ -66,12 +55,7 @@ export async function POST(request: Request) {
       )
       .sort((a, b) => b.score - a.score);
 
-    return NextResponse.json({
-      ok: true,
-      engine: "gemini",
-      data: candidates,
-      latencyMs: Date.now() - started,
-    } satisfies AiResponse<Candidate[]>);
+    return aiSuccess(candidates, "gemini", Date.now() - started, pre.ctx.requestId);
   } catch {
     const candidates = heuristicMatch({
       descriptor: input.descriptor,
@@ -84,11 +68,6 @@ export async function POST(request: Request) {
         zoneId: s.zoneId,
       })),
     });
-    return NextResponse.json({
-      ok: true,
-      engine: "heuristic",
-      data: candidates,
-      latencyMs: Date.now() - started,
-    } satisfies AiResponse<Candidate[]>);
+    return aiSuccess(candidates, "heuristic", Date.now() - started, pre.ctx.requestId);
   }
 }

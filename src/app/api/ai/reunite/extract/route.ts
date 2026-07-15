@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
-import { extractRequestSchema, type AiResponse } from "@/lib/ai/contracts";
+import { extractRequestSchema } from "@/lib/ai/contracts";
 import { generateStructured } from "@/lib/ai/gemini";
 import { descriptorSchema as descriptorResponseSchema } from "@/lib/ai/response-schemas";
 import { EXTRACT_SYSTEM, extractPrompt } from "@/lib/ai/prompts";
 import { heuristicExtract } from "@/lib/ai/heuristics";
 import { descriptorSchema, type Descriptor } from "@/lib/schemas/domain";
+import { aiSuccess, invalidRequest, preflight } from "@/lib/api/security";
 
 export const runtime = "nodejs";
 
@@ -21,23 +21,12 @@ const FALLBACK_BASE: Omit<Descriptor, "lastSeenZoneId" | "minutesAgo"> = {
 };
 
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "invalid-json" } satisfies AiResponse<never>,
-      { status: 400 },
-    );
-  }
+  const pre = await preflight(request, { rateKeyPrefix: "extract" });
+  if (!pre.ok) return pre.response;
 
-  const parsed = extractRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid-request" } satisfies AiResponse<never>,
-      { status: 422 },
-    );
-  }
+  const parsed = extractRequestSchema.safeParse(pre.ctx.body);
+  if (!parsed.success) return invalidRequest(pre.ctx.requestId);
+
   const { freeText, lastSeenZoneId, minutesAgo } = parsed.data;
   const started = Date.now();
 
@@ -51,23 +40,13 @@ export async function POST(request: Request) {
       temperature: 0.2,
     });
     const result = descriptorSchema.parse({ ...raw, lastSeenZoneId, minutesAgo });
-    return NextResponse.json({
-      ok: true,
-      engine: "gemini",
-      data: result,
-      latencyMs: Date.now() - started,
-    } satisfies AiResponse<Descriptor>);
+    return aiSuccess(result, "gemini", Date.now() - started, pre.ctx.requestId);
   } catch {
     const result = heuristicExtract(freeText, {
       ...FALLBACK_BASE,
       lastSeenZoneId,
       minutesAgo,
     });
-    return NextResponse.json({
-      ok: true,
-      engine: "heuristic",
-      data: result,
-      latencyMs: Date.now() - started,
-    } satisfies AiResponse<Descriptor>);
+    return aiSuccess(result, "heuristic", Date.now() - started, pre.ctx.requestId);
   }
 }

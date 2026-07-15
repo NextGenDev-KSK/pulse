@@ -43,7 +43,10 @@ export function useReunitePipeline() {
     for (const c of fresh) {
       processingRef.current.add(c.id);
       void runGuardian(c, (fn, ms) => {
-        const id = setTimeout(fn, ms);
+        const id = setTimeout(() => {
+          timersRef.current = timersRef.current.filter((t) => t !== id);
+          fn();
+        }, ms);
         timersRef.current.push(id);
       });
     }

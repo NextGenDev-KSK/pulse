@@ -99,10 +99,8 @@ export function makeIncident(
   now = Date.now(),
 ): Incident {
   const template = INCIDENT_TEMPLATES[type];
-  const candidateZones =
-    type === "crowd"
-      ? ZONES.filter((z) => z.kind !== "pitch")
-      : ZONES.filter((z) => z.kind !== "pitch");
+  // Incidents can occur anywhere the public can be, i.e. every non-pitch zone.
+  const candidateZones = ZONES.filter((z) => z.kind !== "pitch");
   const zone = zoneId ?? pick(rng, candidateZones).id;
   const severity = Math.min(
     5,

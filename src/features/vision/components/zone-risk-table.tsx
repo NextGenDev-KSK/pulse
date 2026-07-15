@@ -70,13 +70,26 @@ export function ZoneRiskTable() {
                     : t.trend === "falling"
                       ? TrendingDown
                       : Minus;
+                const isSelected = selectedZoneId === t.zoneId;
                 return (
                   <tr
                     key={t.zoneId}
                     onClick={() => setSelectedZone(t.zoneId)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedZone(t.zoneId);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-pressed={isSelected}
+                    aria-label={`Inspect ${zone?.name ?? t.zoneId}, ${Math.round(
+                      t.density,
+                    )} percent density, ${t.risk}`}
                     className={cn(
-                      "cursor-pointer border-b border-border/50 transition-colors hover:bg-muted/40",
-                      selectedZoneId === t.zoneId && "bg-primary/[0.05]",
+                      "cursor-pointer border-b border-border/50 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                      isSelected && "bg-primary/[0.05]",
                     )}
                   >
                     <td className="px-5 py-2.5 font-medium">{zone?.name}</td>

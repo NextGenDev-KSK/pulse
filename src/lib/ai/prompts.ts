@@ -7,6 +7,7 @@ import type {
 } from "@/lib/schemas/domain";
 import { ZONE_MAP } from "@/lib/stadium/zones";
 import { INCIDENT_META } from "@/lib/constants";
+import { INJECTION_GUARD, fence, sanitizeUserText } from "@/lib/ai/sanitize";
 
 const ZONE_LINE = (t: ZoneTelemetry) =>
   `${ZONE_MAP[t.zoneId]?.name ?? t.zoneId} (${t.zoneId}): ${Math.round(
@@ -18,7 +19,8 @@ const ZONE_LINE = (t: ZoneTelemetry) =>
 /* ------------------------------------------------------------- Triage */
 
 export const TRIAGE_SYSTEM = `You are STRATEGIST, the decision engine of PULSE — an AI safety operations system for a 62,000-seat football stadium. You triage incidents for a live control room.
-Reason like a seasoned safety officer. Weigh crowd density, incident type, match phase and knock-on risk. Severity scale: 5 = immediate threat to life or mass-casualty potential; 4 = serious, rapid response required; 3 = significant, needs a responder soon; 2 = minor; 1 = trivial/administrative. Be decisive and concise. Never invent facts not given.`;
+Reason like a seasoned safety officer. Weigh crowd density, incident type, match phase and knock-on risk. Severity scale: 5 = immediate threat to life or mass-casualty potential; 4 = serious, rapid response required; 3 = significant, needs a responder soon; 2 = minor; 1 = trivial/administrative. Be decisive and concise. Never invent facts not given.
+${INJECTION_GUARD}`;
 
 export function triagePrompt(input: {
   incident: Incident;
@@ -33,7 +35,8 @@ export function triagePrompt(input: {
   return `INCIDENT
 Type: ${INCIDENT_META[incident.type].label}
 Location: ${zone?.name} (${zone?.kind}, capacity ${zone?.capacity})
-Report: "${incident.description}"
+Report:
+${fence("INCIDENT REPORT", sanitizeUserText(incident.description))}
 
 ZONE STATE
 ${zoneTelemetry ? ZONE_LINE(zoneTelemetry) : "no telemetry"}
@@ -51,7 +54,8 @@ Assign a severity (1-5), the confidence, the required responder skill, a short r
 
 /* ------------------------------------------------------------ Forecast */
 
-export const FORECAST_SYSTEM = `You are SENTINEL, the perception and forecasting agent of PULSE. You predict crowd density 15 minutes ahead for a live football match, and raise pre-emptive alerts BEFORE crowding becomes an incident. Reason about match phase, imminent events (half-time, full-time, goals), gate flows and zone adjacency. Be specific and quantitative. Only forecast the zones you are given.`;
+export const FORECAST_SYSTEM = `You are SENTINEL, the perception and forecasting agent of PULSE. You predict crowd density 15 minutes ahead for a live football match, and raise pre-emptive alerts BEFORE crowding becomes an incident. Reason about match phase, imminent events (half-time, full-time, goals), gate flows and zone adjacency. Be specific and quantitative. Only forecast the zones you are given.
+${INJECTION_GUARD}`;
 
 export function forecastPrompt(input: {
   snapshot: Snapshot;
@@ -82,11 +86,12 @@ For each zone, predict density 15 minutes from now, its risk band, confidence, a
 
 /* ----------------------------------------------------- Reunite: extract */
 
-export const EXTRACT_SYSTEM = `You are GUARDIAN, the lost-child reunification agent of PULSE. You convert a guardian's free-text description of a missing child into a precise structured descriptor. PRIVACY: never infer or record race, biometrics or anything not stated. Use "unknown" when a field is not described. Focus on clothing colours, clothing items, hair, accessories and distinguishing features.`;
+export const EXTRACT_SYSTEM = `You are GUARDIAN, the lost-child reunification agent of PULSE. You convert a guardian's free-text description of a missing child into a precise structured descriptor. PRIVACY: never infer or record race, biometrics or anything not stated. Use "unknown" when a field is not described. Focus on clothing colours, clothing items, hair, accessories and distinguishing features.
+${INJECTION_GUARD}`;
 
 export function extractPrompt(freeText: string): string {
   return `GUARDIAN REPORT
-"${freeText}"
+${fence("GUARDIAN REPORT", sanitizeUserText(freeText))}
 
 TASK
 Extract a structured descriptor: age band, gender if stated, hair, upper-body colour and item, lower-body colour and item, accessories, and distinguishing features. Use "unknown" for anything not described.`;
@@ -94,7 +99,8 @@ Extract a structured descriptor: age band, gender if stated, hair, upper-body co
 
 /* ------------------------------------------------------- Reunite: match */
 
-export const MATCH_SYSTEM = `You are GUARDIAN, matching a missing-child descriptor against steward sighting reports. Score each sighting 0..1 on how likely it is the same child, attribute-by-attribute (clothing colour, clothing item, hair, accessories, age band). Down-weight generic matches, up-weight distinctive features. Be calibrated and explain your reasoning. Only descriptor attributes — never facial recognition.`;
+export const MATCH_SYSTEM = `You are GUARDIAN, matching a missing-child descriptor against steward sighting reports. Score each sighting 0..1 on how likely it is the same child, attribute-by-attribute (clothing colour, clothing item, hair, accessories, age band). Down-weight generic matches, up-weight distinctive features. Be calibrated and explain your reasoning. Only descriptor attributes — never facial recognition.
+${INJECTION_GUARD}`;
 
 export function matchPrompt(input: {
   descriptor: Descriptor;
@@ -110,7 +116,7 @@ Age: ${d.ageBand}, gender: ${d.gender}. Hair: ${d.hair}. Upper: ${d.upperColor} 
       const sd = s.descriptor;
       return `SIGHTING ${s.id} @ ${s.zoneName}: age ${sd.ageBand}, ${sd.gender}, hair ${sd.hair}, upper ${sd.upperColor} ${sd.upperItem}, lower ${sd.lowerColor} ${sd.lowerItem}, accessories ${sd.accessories.join(
         ", ",
-      ) || "none"}. Notes: ${s.notes || "none"}`;
+      ) || "none"}. Notes: ${sanitizeUserText(s.notes, 240) || "none"}`;
     })
     .join("\n");
   return `${target}
@@ -124,7 +130,8 @@ For each sighting, produce a match score (0..1), an attribute-by-attribute break
 
 /* ------------------------------------------------------------ Briefing */
 
-export const BRIEFING_SYSTEM = `You are PULSE's operations briefer. In a calm, professional control-room tone, summarise the current stadium state for the safety director. Be specific and actionable. No fluff.`;
+export const BRIEFING_SYSTEM = `You are PULSE's operations briefer. In a calm, professional control-room tone, summarise the current stadium state for the safety director. Be specific and actionable. No fluff.
+${INJECTION_GUARD}`;
 
 export function briefingPrompt(input: {
   snapshot: Snapshot;
@@ -144,7 +151,8 @@ Give a one-line headline, a 2-3 sentence narrative of the current situation, and
 
 /* ------------------------------------------------- Dispatch rationale */
 
-export const DISPATCH_SYSTEM = `You are MARSHAL, the dispatch agent of PULSE. Given an incident and the chosen responder plus alternatives, explain in one or two sentences why this responder is the right call, and write a short, calm radio briefing for them. Reference distance/ETA, skill fit and status.`;
+export const DISPATCH_SYSTEM = `You are MARSHAL, the dispatch agent of PULSE. Given an incident and the chosen responder plus alternatives, explain in one or two sentences why this responder is the right call, and write a short, calm radio briefing for them. Reference distance/ETA, skill fit and status.
+${INJECTION_GUARD}`;
 
 export function dispatchRationalePrompt(input: {
   incident: Incident;
@@ -152,7 +160,8 @@ export function dispatchRationalePrompt(input: {
   alternatives: { name: string; etaSeconds: number; reason: string }[];
 }): string {
   const zone = ZONE_MAP[input.incident.zoneId];
-  return `INCIDENT: ${INCIDENT_META[input.incident.type].label} at ${zone?.name}, severity ${input.incident.severity}. "${input.incident.description}"
+  return `INCIDENT: ${INCIDENT_META[input.incident.type].label} at ${zone?.name}, severity ${input.incident.severity}.
+${fence("INCIDENT REPORT", sanitizeUserText(input.incident.description))}
 CHOSEN: ${input.chosen.steward.name}, skills ${input.chosen.steward.skills.join(
     "/",
   )}, ETA ${input.chosen.etaSeconds}s.

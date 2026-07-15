@@ -16,13 +16,17 @@ function getClient(): GoogleGenAI {
 
 const DEFAULT_TIMEOUT_MS = 9000;
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error("gemini-timeout")), ms),
-    ),
-  ]);
+/**
+ * Reject if `promise` doesn't settle within `ms`. Clears the timer on either
+ * outcome so a fast success never leaves a pending timeout (and its reject
+ * closure) alive for the full window.
+ */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("gemini-timeout")), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**

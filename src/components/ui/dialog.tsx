@@ -26,31 +26,63 @@ export function Dialog({
 }: DialogProps) {
   const [mounted, setMounted] = React.useState(false);
   const contentRef = React.useRef<HTMLDivElement>(null);
+  const openerRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => setMounted(true), []);
 
+  // While open: lock scroll, close on Escape, and trap Tab focus in the modal.
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const root = contentRef.current;
+      if (!root) return;
+      const focusables = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || !root.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !root.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      document.body.style.overflow = "";
     };
   }, [open, onClose]);
 
+  // Move focus into the dialog on open; restore it to the opener on close.
+  // Depends on `mounted` too: the portal content only exists after the SSR-safe
+  // first render, so re-run once it does.
   React.useEffect(() => {
-    if (open && contentRef.current) {
-      const focusable = contentRef.current.querySelector<HTMLElement>(
+    if (open && mounted) {
+      if (!openerRef.current) {
+        openerRef.current = document.activeElement as HTMLElement | null;
+      }
+      const focusable = contentRef.current?.querySelector<HTMLElement>(
         "input, textarea, select, button, [tabindex]:not([tabindex='-1'])",
       );
       focusable?.focus();
+    } else if (!open && openerRef.current) {
+      openerRef.current.focus?.();
+      openerRef.current = null;
     }
-  }, [open]);
+  }, [open, mounted]);
 
   if (!mounted) return null;
 

@@ -12,12 +12,20 @@ function download(filename: string, content: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
+// Characters that make a spreadsheet treat a cell as a formula. Prefixing an
+// apostrophe forces the cell to be read as text (OWASP CSV-injection defence).
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+function neutralizeFormula(str: string): string {
+  return FORMULA_LEAD.test(str) ? `'${str}` : str;
+}
+
 function toCsvValue(value: unknown): string {
   if (value === null || value === undefined) return "";
-  if (Array.isArray(value)) return `"${value.join("; ").replace(/"/g, '""')}"`;
+  if (Array.isArray(value))
+    return `"${neutralizeFormula(value.join("; ")).replace(/"/g, '""')}"`;
   if (typeof value === "object")
-    return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
-  const str = String(value);
+    return `"${neutralizeFormula(JSON.stringify(value)).replace(/"/g, '""')}"`;
+  const str = neutralizeFormula(String(value));
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 }
 

@@ -80,6 +80,12 @@ it against the same Zod schema, and falls back to a deterministic **heuristic** 
 shape on a missing key, a 9-second timeout, or malformed output. The response is always tagged
 `engine: "gemini" | "heuristic"` and the UI shows which one answered.
 
+Each handler runs a shared **preflight** first — per-IP fixed-window rate limiting, a JSON
+content-type check, a request-size cap, and safe parsing — and returns a correlatable
+`x-request-id`. All public free text (incident reports, guardian descriptions, steward notes) is
+sanitised and wrapped in labelled untrusted-input fences, with an explicit anti-prompt-injection
+clause on every system prompt, before it reaches Gemini.
+
 ## Technology stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript (strict) · Tailwind CSS v4 ·
@@ -114,9 +120,32 @@ Build and verify:
 
 ```bash
 npm run build          # production build (Turbopack)
-npx tsc --noEmit       # strict type check
-npx eslint .           # lint (0 errors; a few documented advisory warnings)
+npm run typecheck      # strict type check (tsc --noEmit)
+npm run lint           # lint (0 errors; a few documented advisory warnings)
+npm test               # Vitest suite (unit + integration)
+npm run test:coverage  # same, with a V8 coverage report
 ```
+
+## Testing
+
+The project ships a **Vitest + React Testing Library** suite covering the deterministic core of
+the product — the layer a demo can't prove by clicking:
+
+- **Simulation engine** — seeded determinism, phase progression, schema-valid clamped telemetry,
+  and every operator scenario.
+- **Dispatch assignment** — nearest-qualified-responder selection, skill precedence, availability
+  filtering, and alternatives ordering.
+- **AI heuristic engines** — triage severity logic, forecasting, descriptor extraction, and
+  candidate matching, each validated against its Zod schema.
+- **Reunite matching** — sighting generation and per-attribute scoring.
+- **Zod schemas, zone graph, stores, utilities, CSV/JSON export.**
+- **API routes** — request validation, the security preflight (rate limit, size, content-type),
+  and graceful heuristic fallback with no Gemini key.
+- **Security** — prompt-injection sanitisation/fencing and the rate limiter.
+
+The suite runs offline with no keys. Core-logic line coverage is ~95%; the presentational React
+views are verified against the live app rather than snapshot-tested (meaningful over artificial
+coverage).
 
 ## Deployment
 
@@ -163,7 +192,7 @@ src/
 ## Roadmap
 
 - Firestore mirror for multi-console sync.
-- Unit tests for the simulation model, steward assignment, and heuristic engines.
+- Durable (Redis-backed) rate limiter for multi-instance deployments.
 - Role-based steward mobile task view.
 - Multi-venue configuration (externalized zone graph).
 - Nonce-based strict Content-Security-Policy.

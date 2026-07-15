@@ -8,7 +8,7 @@ import { useNotificationStore } from "@/stores/notification-store";
 import { selectResponder, candidateReason } from "./assignment";
 import { requestDispatchRationale } from "@/lib/ai/client";
 import { recordDecision } from "@/lib/ai/record-decision";
-import { SLA_BY_SEVERITY } from "@/lib/constants";
+import { isSlaBreached, slaForSeverity } from "@/lib/constants";
 import { ZONE_MAP } from "@/lib/stadium/zones";
 import { shortestPath } from "@/lib/stadium/graph";
 import { clamp, uid } from "@/lib/utils";
@@ -27,7 +27,12 @@ export function useDispatchPipeline() {
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const later = React.useCallback((fn: () => void, ms: number) => {
-    const id = setTimeout(fn, ms);
+    const id = setTimeout(() => {
+      // Prune the fired timer so the tracking array can't grow unbounded over a
+      // long session (dozens of dispatches × 3 timers each).
+      timersRef.current = timersRef.current.filter((t) => t !== id);
+      fn();
+    }, ms);
     timersRef.current.push(id);
   }, []);
 
@@ -77,7 +82,10 @@ function assign(
   if (!chosen) return;
   const now = Date.now();
   const severity = incident.triage?.severity ?? incident.severity;
-  const slaSeconds = SLA_BY_SEVERITY[severity] ?? 600;
+  const slaSeconds = slaForSeverity(severity);
+  // Breach verdict is fixed at assignment: will the modelled ETA beat the SLA
+  // budget? (Both are simulated seconds — see isSlaBreached.)
+  const breached = isSlaBreached(chosen.etaSeconds, severity);
   const dispatchId = uid("dsp");
   const zoneName = ZONE_MAP[incident.zoneId]?.name ?? incident.zoneId;
 
@@ -90,7 +98,7 @@ function assign(
     createdAt: now,
     etaSeconds: chosen.etaSeconds,
     slaSeconds,
-    slaBreached: false,
+    slaBreached: breached,
     resolvedAt: null,
     rationale: "Assigning nearest qualified responder…",
     statusTimestamps: { assigned: now, "en-route": now },
@@ -155,17 +163,15 @@ function assign(
     });
   }, Math.min(onSceneMs * 0.5, 3000));
 
-  // Arrive on scene.
+  // Arrive on scene. The SLA verdict was fixed at assignment (ETA vs budget);
+  // surface a breach notification when the responder can't make the target.
   later(() => {
-    const elapsed = (Date.now() - now) / 1000;
-    const breached = elapsed > slaSeconds;
     useDispatchStore.getState().advanceStatus(dispatchId, "on-scene", Date.now());
     if (breached) {
-      useDispatchStore.getState().markBreached(dispatchId);
       useNotificationStore.getState().notify({
         kind: "sla",
         title: `SLA breached · ${zoneName}`,
-        detail: `Response exceeded the ${slaSeconds}s target for a severity ${severity} incident.`,
+        detail: `Projected response (${chosen.etaSeconds}s) exceeds the ${slaSeconds}s target for a severity ${severity} incident.`,
       });
     }
     useSimulationStore.getState().updateSteward(chosen.steward.id, {

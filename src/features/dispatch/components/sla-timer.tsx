@@ -14,8 +14,10 @@ export function SlaTimer({ dispatch }: { dispatch: Dispatch }) {
     dispatch.status === "resolved" || dispatch.status === "on-scene";
 
   if (isResolved && onSceneAt) {
-    const responseSecs = (onSceneAt - dispatch.createdAt) / 1000;
-    const met = responseSecs <= dispatch.slaSeconds;
+    // Judge the SLA against the modelled response time (ETA, in simulated
+    // seconds), not the compressed wall-clock demo timing.
+    const responseSecs = dispatch.etaSeconds;
+    const met = !dispatch.slaBreached && responseSecs <= dispatch.slaSeconds;
     return (
       <span
         className={cn(
@@ -56,7 +58,7 @@ export function SlaTimer({ dispatch }: { dispatch: Dispatch }) {
       }}
     >
       <Timer className="size-3" />
-      {remaining <= 0 ? "Overdue" : formatDuration(remaining)} left
+      {remaining <= 0 ? "Overdue" : `${formatDuration(remaining)} left`}
     </span>
   );
 }
