@@ -140,3 +140,35 @@ architecture, APIs, or workflows were changed.
 ### Verification
 `npm run build`, `npm run typecheck`, `npm run lint` (0 errors, 6 documented advisory warnings),
 and `npm test` (201/201, 26 files) all pass.
+
+## Pass — Final review-board / submission-readiness verdict (2026-07-16)
+
+Full judging-panel review (PromptWars + eng/AI/security/a11y/perf/QA/product lenses) against the
+committed state. Goal: decide submission readiness, not add work.
+
+**Result: no new HIGH or MEDIUM code issues.** The forecast NaN bug fixed earlier this pass was the
+only real defect; the working tree is clean and every gate is green:
+`build` ✓ · `typecheck` ✓ · `lint` (0 err / 6 documented warns) ✓ · `test` 201/201 ✓ ·
+`test:coverage` ✓ (aggregate line 37.9% — dominated by presentational `.tsx` views intentionally
+verified live, not snapshot-tested; deterministic core ≈ 95%).
+
+Deployment/readiness checks: live demo `https://pulse-vercel-tau.vercel.app` responds and renders
+the landing page; GitHub repo public and reachable; all README image/link references resolve; the
+clone URL works; `.env.example` present; every env var is optional and the offline heuristic path
+is the default.
+
+**One release blocker (process, not code):** the fix commit is **local-only** — `origin/main` (and
+the Vercel deploy tracking it) still sit on `928677e`, i.e. the buggy build. The repo must be
+**pushed** before submission or judges receive the NaN-forecast version. No code change needed —
+just `git push origin main`.
+
+**LOW (documented, not changed):**
+- Deeper standalone docs referenced by some templates (`ARCHITECTURE.md`, `DEPLOYMENT.md`,
+  `security.md`, `DEMO.md`) do not exist — the project is intentionally single-README; the README
+  covers architecture, deployment, security, demo flow, env vars, and privacy. No broken links.
+- Aggregate coverage number reads low out of context (views counted in the denominator); the
+  README already explains the core-vs-views split honestly.
+- Uncapped incident/dispatch/reunite stores (negligible at demo scale — see previous pass).
+
+**Recommendation:** freeze the codebase after pushing. Remaining effort → demo video, screenshots
+(already embedded), build-in-public post, and the submission writeup.
