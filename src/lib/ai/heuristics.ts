@@ -123,8 +123,12 @@ export function heuristicForecast(input: {
     .map((t) => {
       const kind = ZONE_MAP[t.zoneId]?.kind ?? "stand";
       const hist = trends[t.zoneId] ?? [];
+      // Slope over the last two intervals needs three samples; with fewer we
+      // treat the trend as flat. (`>= 2` would index hist[-1] === undefined and
+      // poison `predicted` with NaN — reachable on the first forecast, when the
+      // density history is exactly two points long.)
       const slope =
-        hist.length >= 2 ? hist[hist.length - 1] - hist[hist.length - 3] : 0;
+        hist.length >= 3 ? hist[hist.length - 1] - hist[hist.length - 3] : 0;
       const bias = (phaseBias as Record<string, number>)[kind] ?? 0;
       const predicted = Math.max(
         0,

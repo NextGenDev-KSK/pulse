@@ -137,6 +137,25 @@ describe("heuristicForecast", () => {
       expect(["crowded", "critical"]).toContain(zone.predictedRisk);
     }
   });
+
+  it("never emits NaN predictions with a short (< 3 point) density history", () => {
+    // Regression: the very first forecast runs when each zone's density history
+    // is exactly two points long (seed + first tick). A 2-interval slope needs
+    // three samples, so with two the trend must be treated as flat rather than
+    // producing NaN (which schema validation rejects and the UI renders "NaN%").
+    for (const hist of [[], [50], [50, 62]]) {
+      const r = heuristicForecast({
+        snapshot: snapshot(),
+        telemetry: [telemetry({ zoneId: "concourse-n", density: 62 })],
+        trends: { "concourse-n": hist },
+      });
+      // Schema-valid (z.number() rejects NaN) and numerically finite.
+      expect(() => forecastResultSchema.parse(r)).not.toThrow();
+      for (const z of r.zones) {
+        expect(Number.isFinite(z.predictedDensity)).toBe(true);
+      }
+    }
+  });
 });
 
 describe("heuristicExtract", () => {

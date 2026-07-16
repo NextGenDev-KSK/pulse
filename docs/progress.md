@@ -10,8 +10,9 @@ each pass appends what changed, why, and how it was verified.
 - **Lint:** `npm run lint` — 0 errors; 6 documented advisory warnings (React-Compiler-preview
   rules deliberately kept as advisories for SSR-safe mount/hydration and impure calls in event
   handlers — see `eslint.config.mjs`).
-- **Tests:** `npm test` — 200 tests across 26 files, all passing. Deterministic-core line
+- **Tests:** `npm test` — 201 tests across 26 files, all passing. Deterministic-core line
   coverage ~94.7%.
+- **Version:** `package.json` is `1.0.0`, matching the published `v1.0.0` release tag.
 
 ## Pass — Quality hardening & test suite (2026-07-15)
 
@@ -85,3 +86,57 @@ guard, client-side auth guard (acceptable — only simulated data behind it; the
 server-side behind rate-limited routes).
 
 Tests grew 176 → 200 (26 files). Build/tsc/lint/test all green.
+
+## Pass — Final pre-submission engineering audit (2026-07-16)
+
+A third full multi-role review (engineer / performance / a11y / security / QA / docs / release)
+of the feature-complete app, treating the whole repository as the source of truth. The prior two
+passes left the codebase in strong shape; this pass found and fixed **one real correctness bug**
+plus a release-hygiene inconsistency, and confirmed the rest is production-ready. No features, UI,
+architecture, APIs, or workflows were changed.
+
+### Correctness (HIGH — fixed)
+- **`heuristicForecast` emitted `NaN` predicted densities on the first forecast.**
+  `src/lib/ai/heuristics.ts` computed the per-zone slope as
+  `hist.length >= 2 ? hist[len-1] - hist[len-3] : 0`. A two-interval delta needs **three** samples;
+  with exactly two, `hist[len-3]` is `hist[-1]` (`undefined`), so `slope` became `NaN` and poisoned
+  `predictedDensity` (`NaN`). This is **reachable on the very first forecast** (fires at
+  `tickCount === 1`, when each zone's density history is exactly two points), i.e. the default
+  offline/heuristic path every judge sees first. `z.number()` rejects `NaN`, and the heuristic
+  fallback is returned to the UI without re-validation, so the value reached the screen as
+  "projected to reach **NaN%**". Fixed by requiring `hist.length >= 3` (flat trend below that).
+  Behaviour for all valid (≥ 3-point) histories is unchanged. Proven pre/post: old formula →
+  `NaN`; new → finite.
+  - Regression test added in `src/lib/ai/heuristics.test.ts`: forecasts over `[]`, `[50]`, and
+    `[50, 62]` histories must be schema-valid and yield finite `predictedDensity`.
+
+### Release hygiene (fixed)
+- `package.json` `version` was `0.1.0` while the repo ships a `v1.0.0` tag + GitHub release. Bumped
+  to `1.0.0` (private package; not surfaced in the UI — pure manifest accuracy).
+
+### Reviewed clean (no change justified)
+- **Performance:** array store selectors use `useShallow`; `useMemo` applied where it pays;
+  charts disable animation on live data; `optimizePackageImports` set for lucide/recharts/framer;
+  every interval/timeout/listener has matching cleanup; pipelines read via `getState()` to avoid
+  extra subscriptions.
+- **Accessibility:** dialog focus-trap + focus-restore + Escape + `aria-modal`; keyboard-operable
+  zone table; command-palette keyboard nav; real `prefers-reduced-motion` block in `globals.css`.
+- **Security:** CSP + full security-header set; per-route preflight (rate limit / size /
+  content-type / safe parse / `x-request-id`); user free-text sanitised + fenced with an injection
+  guard on every system prompt; Gemini output re-validated with Zod; `GEMINI_API_KEY` server-only;
+  no `dangerouslySetInnerHTML` / `eval` / XSS sinks; no `any` beyond the documented Gemini schema;
+  no stray logs (bar the error-boundary), TODOs, or dead code.
+- **Docs:** README claims verified against code (9 s AI timeout, ~95% core coverage, reduced-motion,
+  env vars, agent→route table all accurate).
+
+### Known LOW-priority technical debt (intentionally not changed)
+- The **incident / dispatch / reunite** stores are uncapped, unlike the high-frequency stores
+  (decisions 200, notifications 60, match-events 40, histories 60). In practice these hold
+  low-frequency entities (a few per minute) and stay small for any realistic demo, so no cap was
+  added: capping `dispatches` would also change the cumulative "resolved" count and SLA-health % in
+  the KPI strip. Flagged here so a reviewer can decide if a generous cap is wanted for very long
+  sessions.
+
+### Verification
+`npm run build`, `npm run typecheck`, `npm run lint` (0 errors, 6 documented advisory warnings),
+and `npm test` (201/201, 26 files) all pass.
